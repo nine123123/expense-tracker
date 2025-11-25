@@ -1,0 +1,342 @@
+import React, { useState } from 'react';
+import { Plus, Trash2, User, Heart, Users, RefreshCw, Calculator, DollarSign, ArrowRightCircle, Download } from 'lucide-react';
+
+export default function App() {
+  const [items, setItems] = useState([]);
+  const [itemName, setItemName] = useState('');
+  const [price, setPrice] = useState('');
+  const [splitType, setSplitType] = useState('half'); // half, fan (me removed)
+  const [payer, setPayer] = useState('me'); // me=ปราย, fan=นาย
+  const [theme, setTheme] = useState('sweet'); 
+
+  // Theme Configurations
+  const themes = {
+    sweet: {
+      bg: 'bg-gray-50',
+      card: 'bg-white',
+      text: 'text-gray-800',
+      subText: 'text-gray-500',
+      header: 'bg-gradient-to-r from-blue-500 to-pink-500 text-white',
+      input: 'bg-gray-50 border-gray-200 focus:ring-blue-400',
+      buttonPrimary: 'bg-gray-900 text-white hover:bg-gray-800',
+      settlementBox: 'bg-gray-900 text-white',
+      accentMe: 'text-blue-600 bg-blue-100', // Prai
+      accentFan: 'text-pink-600 bg-pink-100', // Nai
+      accentHalf: 'text-purple-600 bg-purple-100',
+      highlightMe: 'text-blue-300',
+      highlightFan: 'text-pink-300',
+    },
+    minimal: {
+      bg: 'bg-stone-100',
+      card: 'bg-white border border-stone-200',
+      text: 'text-stone-800',
+      subText: 'text-stone-400',
+      header: 'bg-white border-b border-stone-200 text-stone-800',
+      input: 'bg-white border-stone-300 focus:ring-stone-400 focus:border-stone-500',
+      buttonPrimary: 'bg-stone-800 text-white hover:bg-black',
+      settlementBox: 'bg-stone-100 border border-stone-200 text-stone-800',
+      accentMe: 'text-stone-600 bg-stone-100 border border-stone-200',
+      accentFan: 'text-stone-600 bg-stone-100 border border-stone-200',
+      accentHalf: 'text-stone-800 bg-stone-200 border border-stone-300',
+      highlightMe: 'text-stone-600 font-bold',
+      highlightFan: 'text-stone-600 font-bold',
+    },
+    dark: {
+      bg: 'bg-gray-900',
+      card: 'bg-gray-800 border border-gray-700',
+      text: 'text-gray-100',
+      subText: 'text-gray-400',
+      header: 'bg-gray-800 border-b border-gray-700 text-emerald-400',
+      input: 'bg-gray-700 border-gray-600 text-white focus:ring-emerald-500',
+      buttonPrimary: 'bg-emerald-600 text-white hover:bg-emerald-500',
+      settlementBox: 'bg-black/50 border border-gray-700 text-white',
+      accentMe: 'text-cyan-400 bg-cyan-900/30 border border-cyan-800',
+      accentFan: 'text-rose-400 bg-rose-900/30 border border-rose-800',
+      accentHalf: 'text-emerald-400 bg-emerald-900/30 border border-emerald-800',
+      highlightMe: 'text-cyan-400',
+      highlightFan: 'text-rose-400',
+    }
+  };
+
+  const t = themes[theme];
+
+  const addItem = (e) => {
+    e.preventDefault();
+    if (!itemName || !price) return;
+    const newItem = { id: Date.now(), name: itemName, price: parseFloat(price), type: splitType };
+    setItems([...items, newItem]);
+    setItemName('');
+    setPrice('');
+  };
+
+  const removeItem = (id) => {
+    setItems(items.filter(item => item.id !== id));
+  };
+
+  const calculateShares = () => {
+    let myShare = 0, fanShare = 0, total = 0;
+    items.forEach(item => {
+      total += item.price;
+      if (item.type === 'half') { 
+        myShare += item.price / 2; 
+        fanShare += item.price / 2; 
+      } else if (item.type === 'fan') { 
+        fanShare += item.price; 
+      }
+      else if (item.type === 'me') { myShare += item.price; }
+    });
+    return { total, myShare, fanShare };
+  };
+
+  const { total, myShare, fanShare } = calculateShares();
+
+  const getSettlement = () => {
+    if (total === 0) return { msg: 'ยังไม่มีรายการ', amount: 0 };
+    if (payer === 'me') {
+        return { msg: 'นายต้องโอนให้ปราย', amount: fanShare, highlight: t.highlightFan };
+    } else {
+        return { msg: 'ปรายต้องโอนให้นาย', amount: myShare, highlight: t.highlightMe };
+    }
+  };
+
+  const settlement = getSettlement();
+
+  const formatCurrency = (num) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(num);
+
+  const getTypeStyle = (type) => {
+    if (type === 'half') return t.accentHalf;
+    if (type === 'fan') return t.accentFan;
+    return t.accentMe;
+  };
+
+  const exportToCSV = () => {
+    if (items.length === 0) return;
+
+    // BOM เพื่อให้ Excel อ่านภาษาไทยออก
+    const BOM = "\uFEFF";
+    const headers = ["วันที่", "รายการ", "ราคา", "ประเภท", "ใครจ่ายหน้าร้าน", "ส่วนของปราย", "ส่วนของนาย"];
+    
+    const rows = items.map(item => {
+      let typeLabel = 'หารครึ่ง';
+      let itemPraiShare = 0;
+      let itemNaiShare = 0;
+
+      if (item.type === 'half') {
+          typeLabel = 'หารครึ่ง';
+          itemPraiShare = item.price / 2;
+          itemNaiShare = item.price / 2;
+      } else if (item.type === 'fan') {
+          typeLabel = 'จ่ายให้ก่อน (นาย)';
+          itemNaiShare = item.price;
+      } else if (item.type === 'me') {
+          typeLabel = 'ส่วนตัว (ปราย)';
+          itemPraiShare = item.price;
+      }
+      
+      const payerLabel = payer === 'me' ? 'ปราย' : 'นาย';
+      const date = new Date().toLocaleDateString('th-TH');
+      
+      return [date, item.name, item.price, typeLabel, payerLabel, itemPraiShare, itemNaiShare];
+    });
+
+    // เพิ่มบรรทัดสรุปยอด
+    rows.push(["", "ยอดรวมทั้งหมด", total, "", "", myShare, fanShare]);
+    rows.push(["", "สรุปการเคลียร์เงิน", "", "", settlement.msg, settlement.amount, ""]);
+
+    let csvContent = headers.join(",") + "\n";
+    rows.forEach(rowArray => {
+      let row = rowArray.join(",");
+      csvContent += row + "\n";
+    });
+
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `รายการค่าข้าว_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className={`min-h-screen ${t.bg} flex flex-col items-center py-6 px-4 font-sans transition-colors duration-300`}>
+      <div className={`w-full max-w-md ${t.card} rounded-2xl shadow-xl overflow-hidden transition-colors duration-300`}>
+        
+        {/* Header */}
+        <div className={`${t.header} p-6 relative transition-colors duration-300`}>
+          <div className="absolute top-4 right-4 flex gap-1 bg-white/10 backdrop-blur-sm p-1 rounded-full">
+            <button onClick={() => setTheme('sweet')} className={`w-6 h-6 rounded-full bg-gradient-to-r from-blue-400 to-pink-400 border-2 ${theme === 'sweet' ? 'border-white scale-110 shadow-md' : 'border-transparent opacity-50'}`} title="Sweet Mode"></button>
+            <button onClick={() => setTheme('minimal')} className={`w-6 h-6 rounded-full bg-stone-200 border-2 ${theme === 'minimal' ? 'border-stone-500 scale-110 shadow-md' : 'border-transparent opacity-50'}`} title="Minimal Mode"></button>
+            <button onClick={() => setTheme('dark')} className={`w-6 h-6 rounded-full bg-gray-800 border-2 ${theme === 'dark' ? 'border-emerald-400 scale-110 shadow-md' : 'border-gray-600 opacity-50'}`} title="Dark Mode"></button>
+          </div>
+
+          <h1 className="text-2xl font-bold flex items-center justify-center gap-2">
+            <Calculator size={24} />
+            หารค่าข้าว
+          </h1>
+          <p className="opacity-80 text-sm mt-1 text-center">ฉบับ ปราย & นาย</p>
+        </div>
+
+        {/* Input Section */}
+        <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-100'}`}>
+          <form onSubmit={addItem} className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2">
+                <label className={`block text-xs ${t.subText} mb-1`}>ชื่อรายการ</label>
+                <input
+                  type="text"
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
+                  className={`w-full p-2 border rounded-lg focus:outline-none focus:ring-2 ${t.input}`}
+                  placeholder="รายการ..."
+                />
+              </div>
+              <div className="col-span-1">
+                <label className={`block text-xs ${t.subText} mb-1`}>ราคา</label>
+                <input
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className={`w-full p-2 border rounded-lg focus:outline-none focus:ring-2 ${t.input}`}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className={`block text-xs ${t.subText} mb-2`}>ประเภทรายการ</label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { id: 'half', icon: Users, label: 'หารครึ่ง' },
+                  { id: 'fan', icon: ArrowRightCircle, label: 'จ่ายให้ก่อน' } 
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setSplitType(option.id)}
+                    className={`p-3 rounded-lg flex items-center justify-center gap-2 transition-all ${
+                      splitType === option.id ? getTypeStyle(option.id) : `${theme === 'dark' ? 'bg-gray-700 text-gray-400' : 'bg-white text-gray-400 border border-gray-200'}`
+                    }`}
+                  >
+                    <option.icon size={18} />
+                    <span className="text-sm font-medium">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={!itemName || !price}
+              className={`w-full py-3 rounded-xl font-medium shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-transform active:scale-95 ${t.buttonPrimary}`}
+            >
+              <Plus size={18} />
+              เพิ่มรายการ
+            </button>
+          </form>
+        </div>
+
+        {/* Items List */}
+        <div className={`${theme === 'dark' ? 'bg-gray-900/50' : 'bg-gray-50'} p-4 min-h-[150px] max-h-[250px] overflow-y-auto`}>
+          {items.length === 0 ? (
+            <div className={`text-center py-8 flex flex-col items-center ${t.subText}`}>
+              <RefreshCw size={32} className="mb-2 opacity-20" />
+              <p className="text-sm">ยังไม่มีรายการอาหาร</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {items.map((item) => (
+                <div key={item.id} className={`${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} p-3 rounded-lg shadow-sm border flex items-center justify-between`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${getTypeStyle(item.type)}`}>
+                      {item.type === 'half' && <Users size={14} />}
+                      {item.type === 'fan' && <ArrowRightCircle size={14} />}
+                      {item.type === 'me' && <User size={14} />}
+                    </div>
+                    <div>
+                      <p className={`font-medium text-sm ${t.text}`}>{item.name}</p>
+                      <p className={`text-xs ${t.subText}`}>
+                        {item.type === 'half' ? 'หารกัน' : item.type === 'fan' ? 'จ่ายให้ก่อน' : 'ส่วนตัว'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`font-bold ${t.text}`}>{item.price}.-</span>
+                    <button onClick={() => removeItem(item.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Summary Section */}
+        <div className={`border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} ${t.card} p-6 pb-8`}>
+          
+          <div className={`mb-6 p-3 rounded-lg border flex items-center justify-between ${theme === 'dark' ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+            <span className={`text-sm font-medium flex items-center gap-2 ${t.subText}`}>
+              <DollarSign size={16}/> ใครจ่ายหน้าร้าน?
+            </span>
+            <div className={`flex rounded-md p-1 border shadow-sm ${theme === 'dark' ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}>
+               <button onClick={() => setPayer('me')} className={`px-4 py-1.5 text-xs rounded transition-colors ${payer === 'me' ? (theme === 'dark' ? 'bg-cyan-600 text-white' : 'bg-blue-500 text-white') : t.subText}`}>ปราย</button>
+               <button onClick={() => setPayer('fan')} className={`px-4 py-1.5 text-xs rounded transition-colors ${payer === 'fan' ? (theme === 'dark' ? 'bg-rose-600 text-white' : 'bg-pink-500 text-white') : t.subText}`}>นาย</button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className={`p-3 rounded-xl border ${theme === 'minimal' ? 'bg-stone-50 border-stone-200' : (theme === 'dark' ? 'bg-cyan-900/20 border-cyan-800' : 'bg-blue-50 border-blue-100')}`}>
+              <p className={`text-xs font-medium mb-1 ${theme === 'minimal' ? 'text-stone-500' : (theme === 'dark' ? 'text-cyan-400' : 'text-blue-600')}`}>ปราย</p>
+              <p className={`text-xl font-bold ${theme === 'minimal' ? 'text-stone-800' : (theme === 'dark' ? 'text-cyan-100' : 'text-blue-800')}`}>{formatCurrency(myShare)}</p>
+            </div>
+            <div className={`p-3 rounded-xl border ${theme === 'minimal' ? 'bg-stone-50 border-stone-200' : (theme === 'dark' ? 'bg-rose-900/20 border-rose-800' : 'bg-pink-50 border-pink-100')}`}>
+              <p className={`text-xs font-medium mb-1 ${theme === 'minimal' ? 'text-stone-500' : (theme === 'dark' ? 'text-rose-400' : 'text-pink-600')}`}>นาย</p>
+              <p className={`text-xl font-bold ${theme === 'minimal' ? 'text-stone-800' : (theme === 'dark' ? 'text-rose-100' : 'text-pink-800')}`}>{formatCurrency(fanShare)}</p>
+            </div>
+          </div>
+
+          <div className={`${t.settlementBox} rounded-xl p-4 shadow-lg transition-colors`}>
+            <div className={`flex justify-between items-center border-b pb-3 mb-3 ${theme === 'dark' ? 'border-gray-600' : 'border-white/20'}`}>
+              <span className={`text-sm opacity-80`}>ยอดรวมบิล</span>
+              <span className="text-xl font-bold">{formatCurrency(total)}</span>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm font-light opacity-80 mb-1">ต้องเคลียร์เงิน</p>
+                <p className={`text-lg font-bold ${settlement.highlight}`}>
+                  {settlement.msg}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className={`text-3xl font-extrabold tracking-tight ${theme === 'minimal' ? 'text-stone-800' : 'text-white'}`}>
+                  {formatCurrency(settlement.amount)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            <button 
+              onClick={exportToCSV}
+              className={`py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-2 transition-colors border ${theme === 'dark' ? 'border-emerald-700 text-emerald-400 hover:bg-emerald-900/50' : 'border-green-200 text-green-700 hover:bg-green-50 bg-white'}`}
+            >
+              <Download size={14} />
+              บันทึก Excel
+            </button>
+            <button 
+              onClick={() => setItems([])}
+              className={`py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-2 transition-colors border ${theme === 'dark' ? 'border-gray-600 text-gray-400 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'}`}
+            >
+              <RefreshCw size={14} />
+              เริ่มบิลใหม่
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
